@@ -119,10 +119,14 @@ Error:
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+
 #include <iostream>
-#include <stdio.h>
+#include <fstream>
+#include <vector>
+
 
 // define the size of the image
+// assume square
 #define ROWS 1024
 #define COLS 1024
 
@@ -143,87 +147,94 @@ __global__ void blurImage(float* input, float* output, size_t width, size_t heig
   }
 }
 
-bool make_img() {
-  /* PGM format spec:
+/* PGM format spec:
   * https://users.wpi.edu/~cfurlong/me-593n/pgmimage.html
-  * header starts with P5
+  * header starts with P5 or P2 (ASCII)
   * width height
   * max_val
   * raw_data
   */
-  const char* filename = "black_diagonal.pgm";
-  /* 2D img array, no color */
-  unsigned char data[COLS][ROWS];
-
-  // bitshift value format
-  const int bit_format = 8;
-  const int max_val = (1 << bit_format) - 1;
-
-  FILE* fp;
-  const char* comment = "#Diagonal black line";
-
-  /* black diagonal */
-  for (size_t y = 0; y < COLS; ++y) {
-    for (size_t x = 0; x < ROWS; ++x) {
-      if (x == y) {
-        data[y][x] = 0; // black
-      }
-      else {
-        data[y][x] = max_val; // white
-      }
-    }
+bool writePGM(const std::string& filename, const std::vector<std::vector<int>>& data) {
+  std::ofstream file(filename, std::ios::out);
+  if (!file.is_open()) {
+    std::cerr << "Failed to open file: " << filename << std::endl;
+    return false;
   }
 
-  /* write the whole data array to ppm file in one step */
-  /* create new file, give it a name and open it in binary mode */
-  fp = fopen(filename, "wb");
-  /* write header to the file */
-  fprintf(fp, "P5\n %s\n %d\n %d\n %d\n", comment, COLS, ROWS,
-    max_val);
-  /* write image data bytes to the file */
-  fwrite(data, sizeof(data), 1, fp);
-  fclose(fp);
+  // PGM header
+  // ASCII
+  file << "P2" << std::endl;
+  file << "# " << "test.pgm" << std::endl;
+  file << COLS << " " << ROWS << std::endl;
+  // 8 bit
+  file << 255 << std::endl;
 
+  // Write pixel values
+   for (size_t x = 0; x < ROWS; x++) {
+    for (size_t y = 0; y < COLS; y++) {
+        file << data[x][y] << " ";
+    }
+       file << std::endl;
+  }
+
+  file.close();
   return true;
 }
 
+void drawDiag(std::vector<std::vector<int>>& data, int width) {
+  int rows = data.size();
+  int cols = data[0].size();
+  for (int i = 0; i < rows; i++) {
+    for (int j = std::max(0, i - width); j <= std::min(cols-1, i+width); j++) {
+      data[i][j] = 0;
+    }
+  }
+}
 
 int main() {
-  bool img_file_created = make_img();
-  if (img_file_created) {
-    int* h_a, * h_b, * h_c;
-    int* d_a, * d_b, * d_c;
+  // creates white image
+  std::vector<std::vector<int>> data(
+    ROWS,
+    std::vector<int>(COLS,255));
+  drawDiag(data, 2);
+  writePGM("test.pgm", data);
+  //data.res
+  //bool img_file_created = writePGM("black_diagonal.pgm");
+  //if (img_file_created) {
+  //  int* h_a, * h_b, * h_c;
+  //  int* d_a, * d_b, * d_c;
 
-    //size_t arr_size = ROWS * sizeof(float);
+  //  //size_t arr_size = ROWS * sizeof(float);
 
-    cudaMalloc((void**)&d_a, arr_size);
-    cudaMalloc((void**)&d_b, arr_size);
-    cudaMalloc((void**)&d_c, arr_size);
+  //  cudaMalloc((void**)&d_a, arr_size);
+  //  cudaMalloc((void**)&d_b, arr_size);
+  //  cudaMalloc((void**)&d_c, arr_size);
 
-    h_a = (int*)malloc(arr_size);
-    h_b = (int*)malloc(arr_size);
-    h_c = (int*)malloc(arr_size);
-
-
-    cudaMemcpy(d_a, h_a, arr_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, h_b, arr_size, cudaMemcpyHostToDevice);
-
-
-    //blurImage << < N / HILOS_POR_BLOQUE, HILOS_POR_BLOQUE >> > (d_a, d_b, d_c, N);
-
-    cudaMemcpy(h_c, d_c, arr_size, cudaMemcpyDeviceToHost);
+  //  h_a = (int*)malloc(arr_size);
+  //  h_b = (int*)malloc(arr_size);
+  //  h_c = (int*)malloc(arr_size);
 
 
-    free(h_a);
-    free(h_b);
-    free(h_c);
-    cudaFree(d_a);
-    cudaFree(d_b);
-    cudaFree(d_c);
-    return 0;
-  }
-  else {
-    printf("Could not create file");
-    return 0;
-  }
+  //  cudaMemcpy(d_a, h_a, arr_size, cudaMemcpyHostToDevice);
+  //  cudaMemcpy(d_b, h_b, arr_size, cudaMemcpyHostToDevice);
+
+
+  //  //blurImage << < N / HILOS_POR_BLOQUE, HILOS_POR_BLOQUE >> > (d_a, d_b, d_c, N);
+
+  //  cudaMemcpy(h_c, d_c, arr_size, cudaMemcpyDeviceToHost);
+
+
+  //  free(h_a);
+  //  free(h_b);
+  //  free(h_c);
+  //  cudaFree(d_a);
+  //  cudaFree(d_b);
+  //  cudaFree(d_c);
+  //  return 0;
+  //}
+  //else {
+  //  printf("Could not create file");
+  //  return 0;
+  //}
+  return 0;
 }
