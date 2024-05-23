@@ -18,7 +18,7 @@
 
 // constant for GPU mem
 #define FILTER_RADIUS 2
-__constant__ float FILTER[2 * FILTER_RADIUS + 1][2 * FILTER_RADIUS + 1]{1/9};
+__constant__ float FILTER[2 * FILTER_RADIUS + 1][2 * FILTER_RADIUS + 1];
 
 
 __global__ void blurImage(int* input, int* output, float* filter, int radius, size_t width, size_t height) {
@@ -33,11 +33,11 @@ __global__ void blurImage(int* input, int* output, float* filter, int radius, si
         int inputRow = y_idx - radius + filterRow;
         int inputCol = x_idx - radius + filterCol;
         if (inputRow >= 0 && inputRow < height && inputCol >=0 && inputCol < width){
-          res += filter[filterRow][filterCol] * input[inputRow * width + inputCol];
+          res += filter[(filterRow * 2 * radius + 1) + filterCol] * input[inputRow * width + inputCol];
       }
     }
   }
-  output[y_idx*width+x_idx] = res;
+  output[y_idx*width+x_idx] = (int)res;
 }
 
 /* PGM format spec:
@@ -47,7 +47,7 @@ __global__ void blurImage(int* input, int* output, float* filter, int radius, si
   * max_val
   * raw_data
   */
-bool writePGM(const std::string& filename, const std::vector<std::vector<int>>& data) {
+bool writePGM(const std::string& filename, int* data, size_t rows, size_t cols) {
   std::ofstream file(filename, std::ios::out);
   if (!file.is_open()) {
     std::cerr << "Failed to open file: " << filename << std::endl;
@@ -58,55 +58,62 @@ bool writePGM(const std::string& filename, const std::vector<std::vector<int>>& 
   // ASCII
   file << "P2" << std::endl;
   file << "# " << "test.pgm" << std::endl;
-  file << COLS << " " << ROWS << std::endl;
+  file << cols << " " << rows << std::endl;
   // 8 bit
   file << 255 << std::endl;
 
   // Write pixel values
-   for (size_t x = 0; x < ROWS; x++) {
-    for (size_t y = 0; y < COLS; y++) {
-        file << data[x][y] << " ";
+  for (size_t x = 0; x < rows; x++) {
+    for (size_t y = 0; y < cols; y++) {
+      file << data[x * cols + y] << " ";
     }
-       file << std::endl;
+    file << std::endl;
   }
 
   file.close();
   return true;
 }
 
-void drawDiag(std::vector<std::vector<int>>& data, int width) {
-  int rows = data.size();
-  int cols = data[0].size();
-  for (int i = 0; i < rows; i++) {
-    for (int j = std::max(0, i - width); j <= std::min(cols-1, i+width); j++) {
-      data[i][j] = 0;
+void drawDiag(int* data, int rows, int cols, int width) {
+  for (int i = 0; i < rows; ++i) {
+    // Calculate the range of columns to modify for the current row
+    int start_col = std::max(0, i - width);
+    int end_col = std::min(cols - 1, i + width);
+
+    for (int j = start_col; j <= end_col; ++j) {
+      // Set the value at the corresponding 1D array index
+      data[i * cols + j] = 0;
     }
   }
 }
 
 int main() {
   // creates white image
-  std::vector<std::vector<int>> data(
-    ROWS,
-    std::vector<int>(COLS,255));
-  drawDiag(data, 2);
-  bool img_file_created = writePGM("test.pgm", data);
+  int* data = new int[ROWS * COLS]{ 255 };
+
+  drawDiag(data, ROWS, COLS, 2);
+  bool img_file_created = writePGM("test.pgm", data, ROWS, COLS);
   assertm(img_file_created == true, "Image file created\n!");
 
   int* h_input = new int[ROWS * COLS];
   int* h_output = new int[ROWS * COLS];
 
-  const int filter_byte_size = sizeof(float) * (2 * FILTER_RADIUS + 1) * (2 * FILTER_RADIUS + 1);
-  const int input_byte_size = sizeof(int) * ROWS * COLS;
+  int filter_byte_size = sizeof(float) * (2 * FILTER_RADIUS + 1) * (2 * FILTER_RADIUS + 1);
+  int input_byte_size = sizeof(int) * ROWS * COLS;
 
   for (int i = 0; i < ROWS; i++) {
     for (int j = 0; j < COLS; j++) {
-      h_input[i * COLS + j] = data[i][j];
+      h_input[i * COLS + j] = data[i * COLS + j];
     }
   }
 
   // initialize normalizecd filter 
-  int* h_filter = new int[(2 * FILTER_RADIUS + 1) * (2 * FILTER_RADIUS + 1)] {1/9};
+  float* h_filter = new float[(2 * FILTER_RADIUS + 1)*(2 * FILTER_RADIUS + 1)];
+  
+  for (size_t i = 0; i < (2 * FILTER_RADIUS + 1) * (2 * FILTER_RADIUS + 1); i++) {
+    h_filter[i] = static_cast<float>(1.0f / 9.0f);
+  }
+
 
   // GPU arrs
   int* d_input;
@@ -121,17 +128,20 @@ int main() {
   // Copy data from the host to the device
   cudaMemcpy(d_input, h_input, input_byte_size, cudaMemcpyHostToDevice);
   // might not need this
-  cudaMemcpy(FILTER, h_filter, filter_byte_size, cudaMemcpyHostToDevice);
+  //cudaMemcpy(FILTER, h_filter, filter_byte_size, cudaMemcpyHostToDevice);
 
   // Define block and grid dimensions
   dim3 blockDim(16, 16);  // 16x16 threads per block
   dim3 gridDim((COLS + blockDim.x - 1) / blockDim.x, (ROWS + blockDim.y - 1) / blockDim.y);
 
   // Launch the kernel
-  blurImage << <gridDim, blockDim >> > (d_input, d_output, d_filter, FILTER_RADIUS, COLS, ROWS);
+  blurImage <<<gridDim, blockDim>>>(d_input, d_output, h_filter, FILTER_RADIUS, COLS, ROWS);
 
   // Copy the result back to the host
   cudaMemcpy(h_output, d_output, input_byte_size, cudaMemcpyDeviceToHost);
+
+  bool blurred_img = writePGM("blur.pgm", h_output, ROWS, COLS);
+  assertm(blurred_img == true, "Image file is blurred!\n");
 
   // Free device memory
   cudaFree(d_input);
