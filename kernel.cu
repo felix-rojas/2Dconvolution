@@ -18,7 +18,6 @@
 
 #define FILTER_SIZE 3
 #define FILTER_OFFSET (FILTER_SIZE/2);
-
 // constant for GPU mem
 __constant__ float FILTER[3 * 3];
 
@@ -117,9 +116,9 @@ int main() {
 
   float* h_filter = new float[FILTER_SIZE * FILTER_SIZE];
 
-  // initialize normalizecd filter
+  // initialize normalized filter
   for (int i = 0; i < FILTER_SIZE * FILTER_SIZE; i++) {
-    h_filter[i] = 1.0f / 9.0f;
+    h_filter[i] = 1.0f / static_cast<float>(FILTER_SIZE * FILTER_SIZE);
   }
 
   // GPU arrs
