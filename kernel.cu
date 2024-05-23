@@ -18,16 +18,17 @@
 
 // constant for GPU mem
 #define FILTER_RADIUS 2
+
 __constant__ float FILTER[2 * FILTER_RADIUS + 1][2 * FILTER_RADIUS + 1];
 
 
-__global__ void blurImage(int* input, int* output, float* filter, int radius, size_t width, size_t height) {
+__global__ void blurImage(int* input, float* output, float* filter, int radius, size_t width, size_t height) {
   // by using a global index to the total size of the array
   // we get the position by using the threadIDx, blockIdx* block Dimx 
   // same goes for y index
   int x_idx = threadIdx.x + blockIdx.x * blockDim.x;
   int y_idx = threadIdx.y + blockIdx.y * blockDim.y;
-  float res = 0;
+  float res = 0.0f;
     for (int filterRow = 0; filterRow < 2*radius+1; filterRow++) {
       for (int filterCol = 0; filterCol < 2 * radius + 1; filterCol++) {
         int inputRow = y_idx - radius + filterRow;
@@ -37,7 +38,7 @@ __global__ void blurImage(int* input, int* output, float* filter, int radius, si
       }
     }
   }
-  output[y_idx*width+x_idx] = (int)res;
+  output[y_idx*width+x_idx] = res;
 }
 
 /* PGM format spec:
@@ -47,7 +48,7 @@ __global__ void blurImage(int* input, int* output, float* filter, int radius, si
   * max_val
   * raw_data
   */
-bool writePGM(const std::string& filename, int* data, size_t rows, size_t cols) {
+bool writePGM(const std::string& filename, float* data, size_t rows, size_t cols) {
   std::ofstream file(filename, std::ios::out);
   if (!file.is_open()) {
     std::cerr << "Failed to open file: " << filename << std::endl;
@@ -74,7 +75,7 @@ bool writePGM(const std::string& filename, int* data, size_t rows, size_t cols) 
   return true;
 }
 
-void drawDiag(int* data, int rows, int cols, int width) {
+void drawDiag(float* data, int rows, int cols, int width) {
   for (int i = 0; i < rows; ++i) {
     // Calculate the range of columns to modify for the current row
     int start_col = std::max(0, i - width);
@@ -89,14 +90,14 @@ void drawDiag(int* data, int rows, int cols, int width) {
 
 int main() {
   // creates white image
-  int* data = new int[ROWS * COLS]{ 255 };
-
+  float* data = new float[ROWS * COLS];
+  std::fill(data, data + ROWS * COLS, 255);
   drawDiag(data, ROWS, COLS, 2);
   bool img_file_created = writePGM("test.pgm", data, ROWS, COLS);
   assertm(img_file_created == true, "Image file created\n!");
 
   int* h_input = new int[ROWS * COLS];
-  int* h_output = new int[ROWS * COLS];
+  float* h_output = new float[ROWS * COLS];
 
   int filter_byte_size = sizeof(float) * (2 * FILTER_RADIUS + 1) * (2 * FILTER_RADIUS + 1);
   int input_byte_size = sizeof(int) * ROWS * COLS;
@@ -111,13 +112,13 @@ int main() {
   float* h_filter = new float[(2 * FILTER_RADIUS + 1)*(2 * FILTER_RADIUS + 1)];
   
   for (size_t i = 0; i < (2 * FILTER_RADIUS + 1) * (2 * FILTER_RADIUS + 1); i++) {
-    h_filter[i] = static_cast<float>(1.0f / 9.0f);
+    h_filter[i] = 1.0f / 9.0f;
   }
 
 
   // GPU arrs
   int* d_input;
-  int* d_output;
+  float* d_output;
 
   // gpu alloc
   cudaMalloc(&d_input, input_byte_size);
