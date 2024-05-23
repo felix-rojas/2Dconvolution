@@ -1,5 +1,4 @@
-﻿
-#include "cuda_runtime.h"
+﻿#include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
 #include <iostream>
@@ -17,7 +16,6 @@
 #define ROWS 1024
 #define COLS 1024
 
-
 #define FILTER_SIZE 3
 #define FILTER_OFFSET (FILTER_SIZE/2);
 
@@ -26,7 +24,7 @@ __constant__ float FILTER[3 * 3];
 
 __global__ void blurImage(float* input, float* output, float* filter, size_t width, size_t height) {
   // by using a global index to the total size of the array
-  // we get the position by using the threadIDx, blockIdx* block Dimx 
+  // we get the position by using the threadIDx, blockIdx* block Dimx
   // same goes for y index
   int row = threadIdx.x + blockIdx.x * blockDim.x;
   int col = threadIdx.y + blockIdx.y * blockDim.y;
@@ -34,7 +32,7 @@ __global__ void blurImage(float* input, float* output, float* filter, size_t wid
 
   int row_offset = row - FILTER_OFFSET;
   int col_offset = col - FILTER_OFFSET;
-  
+
   float res = 0.0f;
   // Iterate over all the rows
   for (int i = 0; i < FILTER_SIZE; i++) {
@@ -100,7 +98,6 @@ void drawDiag(float* data, int rows, int cols, int width) {
   }
 }
 
-
 int main() {
   int THREADS = 16;
   // creates white image
@@ -110,18 +107,17 @@ int main() {
 
   bool img_file_created = writePGM("test.pgm", h_input, ROWS, COLS);
   assertm(img_file_created == true, "Image file created\n!");
-  
+
   float* h_output = new float[ROWS * COLS];
 
   std::fill(h_output, h_output + ROWS * COLS, 0.0f);
-
 
   int filter_byte_size = sizeof(float) * FILTER_SIZE * FILTER_SIZE;
   int input_byte_size = sizeof(float) * ROWS * COLS;
 
   float* h_filter = new float[FILTER_SIZE * FILTER_SIZE];
 
-  // initialize normalizecd filter 
+  // initialize normalizecd filter
   for (int i = 0; i < FILTER_SIZE * FILTER_SIZE; i++) {
     h_filter[i] = 1.0f / 9.0f;
   }
@@ -149,7 +145,7 @@ int main() {
   dim3 gridDim(block_size, block_size);
 
   // Launch the kernel
-  blurImage <<<gridDim, blockDim>>>(d_input, d_output, FILTER, ROWS, COLS);
+  blurImage << <gridDim, blockDim >> > (d_input, d_output, FILTER, ROWS, COLS);
 
   // Copy the result back to the host
   cudaMemcpy(h_output, d_output, input_byte_size, cudaMemcpyDeviceToHost);
