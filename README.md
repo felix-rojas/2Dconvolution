@@ -80,3 +80,27 @@ This pseudocode has $O(n^2 * m_k * n_k)$ !
 If the kernel size is similar to the input size... well that is basically $O(n^4)$.
 
 Now, in this cuda implementation, the complexity of the task is reduced to $O(n^2)$ *for each core*. Now this is crucial: For *each core* we add to the processing of this, the further the task is subdivided. Add that to the fact that all memory accesses are contiguous both in space and lodgically (which the GPU can transfer much faster), the difference is quite significant!
+
+## Testing
+
+The test designed is visual, with a few assertions to make sure we input and output the image files.
+
+The resulting files [test.pgm](./test.pgm) and [blur.pgm](./blur.pgm) can be seen in an online viewer or opened with an editor.
+
+[test.pgm](./test.pgm) has the middle section crossed by a black diagonal and can be seen, even when edited in a text file that *clearly* there's a line in the middle.
+
+[blur.pgm](./blur.pgm) on the other hand, is the same image but the diagonal is now blurred. The blurring might be difficult to detect in the image BUT when in a text editor, the "numerical blurring" is very clear.
+
+All parameters are hard coded (for now). Simply compile the `kernel.cu` file and run it, nothing else is needed.
+
+The images can be seen using an online viewer such as [this one](https://imagetostl.com/view-pgm-online) or download [IrfanView](https://www.irfanview.com/). IrfanView is a pretty light-weight image viewer, no bloat, no ads.
+
+Here's how the images should look like:
+
+### NO BLUR
+
+[test.png](./test.png)
+
+### BLURRED
+
+[blur.png](./blur.png)
