@@ -71,9 +71,11 @@ The implementation of the arrays forces any data to be stored as a 1D array. We 
 
 The task is divided in grids of 64x64 and blocks of 16x16. I can change this parameter later because it is a task that can be much further subdivided, which would give us much better performance.
 
-See the following example:
+See the following example by Patrice's pseudocode of one of their lectures at Auckland University 
 
 ![alt text](image-1.png)
+
+Original presenttion available here: [Patrices Lecture PDF presentation](https://www.cs.auckland.ac.nz/compsci373s1c/PatricesLectures/Convolution_1up.pdf)
 
 This pseudocode has $O(n^2 * m_k * n_k)$ !
 
@@ -99,8 +101,8 @@ Here's how the images should look like:
 
 ### NO BLUR
 
-[test.png](./test.png)
+![test.png](./test.png)
 
 ### BLURRED
 
-[blur.png](./blur.png)
+![blur.png](./blur.png)
